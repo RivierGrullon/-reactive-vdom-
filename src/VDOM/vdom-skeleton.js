@@ -40,7 +40,7 @@ export function mount(vnode, container) {
 }
 
 //** Unmounte a vnode from the DOM */
-function unmount(vnode) {
+export function unmount(vnode) {
     vnode.el.parentNode.removeChild(vnode.el);
 
 }

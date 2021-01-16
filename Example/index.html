@@ -1,12 +1,160 @@
 <!DOCTYPE html>
 <html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Document</title>
-</head>
-<body>
-    <div id="app"></div>
-</body>
-<script src="./index.js" type="module"></script>
+  </head>
+  <body>
+    <div id="app" onclick="state.count++"></div>
+  </body>
+  <script>
+    //global temporary variable
+    var activeEffect;
+
+    function watchEffect(fn) {
+      activeEffect = fn;
+      fn();
+      activeEffect = null;
+    }
+
+    class Dep {
+      suscribers = new Set();
+      //suscribe a new funtion as observer to the dependency
+      observer() {
+        if (activeEffect) {
+          this.suscribers.add(activeEffect);
+        }
+      }
+
+      //notify suscribers of a value change
+      notify() {
+        this.suscribers.forEach((suscriber) => suscriber());
+      }
+    }
+
+    function reactive(obj) {
+      Object.keys(obj).forEach((key) => {
+        const dep = new Dep();
+        let value = obj[key];
+        Object.defineProperty(obj, key, {
+          get() {
+            dep.observer();
+            return value;
+          },
+          set(newValue) {
+            if (newValue !== value) {
+              value = newValue;
+              dep.notify();
+            }
+          },
+        });
+      });
+      return obj;
+    }
+
+    //create a virtual node
+    function createVNode(tag, props, children) {
+      //return virtual node
+      return {
+        tag,
+        props,
+        children,
+      };
+    }
+
+    /**
+     * mount a virtual node to the DOM
+     * @param vnode virtual node to render
+     * @param container container where will be mount
+     */
+    function mount(vnode, container) {
+      //create element
+      const el = (vnode.el = document.createElement(vnode.tag));
+      //set props
+      for (const key in vnode.props) {
+        el.setAttribute(key, vnode.props[key]);
+      }
+      //handle children
+      // if children is a text
+      if (typeof vnode.children === "string") {
+        el.textContent = vnode.children;
+      }
+
+      // if childre are virtual nodes
+      else {
+        vnode.children.forEach((child) => {
+          mount(child, el);
+        });
+      }
+      //mount to the DOM
+      container.appendChild(el);
+
+      return vnode;
+    }
+
+    //** Unmounte a vnode from the DOM */
+    function unmount(vnode) {
+      vnode.el.parentNode.removeChild(vnode.el);
+    }
+
+    //** take 2 vnodes, compare and figure out what's the difference */
+    function patch(vn1, vn2) {
+      const el = (vn2.el = vn1.el);
+
+      if (vn1.tag !== vn2.tag) {
+        mount(vn2, el.parentNode);
+      } else {
+        //Case where the new vnode has a string children
+        if (typeof vn2.children === "string") {
+          el.textContent = vn2.children;
+        } else {
+          //Case where the new vnode has an array of vnodes
+          const c1 = vn1.children;
+          const c2 = vn2.children;
+          const commonLength = Math.min(c1.length, c2.length);
+
+          for (let i = 0; i < commonLength; i++) {
+            patch(c1[i], c2[i]);
+          }
+
+          if (c1.length > c2.length) {
+            c1.slice(c2.length).forEach((child) => {
+              unmount(child);
+            });
+          } else if (c2.length > c1.length) {
+            c2.slice(c1.length).forEach((child) => {
+              mount(child, el);
+            });
+          }
+        }
+      }
+    }
+
+    function render(clickCount) {
+      return createVNode(
+        "div",
+        { class: "container" },
+        [createVNode("h1", null, clickCount)],
+        createVNode("p", null, "clicks")
+      );
+    }
+
+    const state = reactive({
+      count: 0,
+    });
+
+    let previousNode;
+
+    watchEffect(() => {
+      if (!previousNode) {
+        previousNode = render(String(state.count));
+        mount(previousNode, document.querySelector("#app"));
+      } else {
+        const newVNode = render(String(state.count));
+        patch(previousNode, newVNode);
+        previousNode = newVNode;
+      }
+    }); //render a vnode
+  </script>
 </html>
