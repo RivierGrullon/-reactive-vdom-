@@ -48,7 +48,7 @@ function unmount(vnode) {
 //** take 2 vnodes, compare and figure out what's the difference */
 export function patch(vn1, vn2) {
     const el = (vn2.el = vn1.el);
-    
+
     if (vn1.tag !== vn2.tag) {
         mount(vn2, el.parentNode);
     } else {
